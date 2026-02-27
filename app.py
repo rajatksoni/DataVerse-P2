@@ -305,13 +305,19 @@ with col_shap:
     display_names = [FEATURE_DISPLAY[f] for f in FEATURES]
     shap_vals = explainer.shap_values(input_arr)
 
-    # Binary classifier → list of two arrays; take class-1 (default)
+    # Binary classifier → take class-1 (default) SHAP values
+    ev = explainer.expected_value
     if isinstance(shap_vals, list):
+        # Older SHAP: list of [class0_array, class1_array]
         sv   = shap_vals[1][0]
-        base = explainer.expected_value[1]
+        base = ev[1]
+    elif shap_vals.ndim == 3:
+        # Newer SHAP: single array of shape (n_samples, n_features, n_classes)
+        sv   = shap_vals[0, :, 1]
+        base = float(ev[1]) if hasattr(ev, '__len__') else float(ev)
     else:
+        # Fallback: shape (n_samples, n_features) — single-output
         sv   = shap_vals[0]
-        ev   = explainer.expected_value
         base = float(ev[1]) if hasattr(ev, '__len__') and len(ev) > 1 else float(ev)
 
     explanation = shap.Explanation(
