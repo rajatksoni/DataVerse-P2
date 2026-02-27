@@ -1,9 +1,10 @@
 """
-app.py — LUMON INDUSTRIES · Risk Underwriting Terminal
-======================================================
-Severance-inspired brutalist dashboard:
-  • Left  : Applicant Terminal — sliders + Calculated Risk Vector
-  • Right : Advanced Analytics — SHAP Waterfall + Risk Density KDE
+app.py — Risk Underwriting Simulator & Concept Drift Detector
+=============================================================
+Brutalist dashboard:
+  • Row 1 Left  : Risk Simulator — sliders + Calculated Risk Vector
+  • Row 1 Right : SHAP Waterfall + Risk Density KDE
+  • Row 2       : Concept Drift + Income Paradox charts
 """
 
 import streamlit as st
@@ -22,8 +23,8 @@ from scipy.stats import gaussian_kde
 # PAGE CONFIG
 # ──────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="LUMON · Risk Terminal",
-    page_icon="🏢",
+    page_title="Risk Underwriting Simulator",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -206,12 +207,12 @@ df, model, explainer, baseline_probas = init_app()
 # ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero-banner">
-    <div class="hero-title">🏢 &nbsp;Lumon Industries</div>
+    <div class="hero-title">🛡️ &nbsp;Risk Underwriting Simulator</div>
     <div class="hero-divider"></div>
     <div class="hero-sub">
-        Macrodata Refinement · Risk Underwriting Terminal
-        &nbsp;&nbsp;·&nbsp;&nbsp; RF-100T / D7 / Balanced
-        &nbsp;&nbsp;·&nbsp;&nbsp; 1,000,000+ Loan Records
+        Concept Drift Detector
+        &nbsp;&nbsp;·&nbsp;&nbsp; Powered by Random Forest (100 trees, depth-7, balanced)
+        &nbsp;&nbsp;·&nbsp;&nbsp; Trained on 1M+ Lending Club loans
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -251,8 +252,8 @@ with left_col:
 
     st.markdown("""
     <div class="brutal-card">
-        <div class="lumon-header">Department of Risk Assessment</div>
-        <div class="lumon-title">Applicant Terminal</div>
+        <div class="lumon-header">Risk Simulator</div>
+        <div class="lumon-title">Applicant Profile</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -502,6 +503,113 @@ with right_col:
     st.plotly_chart(fig_kde, use_container_width=True)
 
 
+# ══════════════════════════════════════════════════════
+#  ROW 2 — Concept Drift  |  Income Paradox
+# ══════════════════════════════════════════════════════
+st.markdown('<hr class="section-rule">', unsafe_allow_html=True)
+
+col_drift, col_paradox = st.columns(2, gap="medium")
+
+# ──────────────── Concept Drift ───────────────────────
+with col_drift:
+    st.markdown("""
+    <div class="brutal-card">
+        <div class="lumon-header">Temporal Analysis</div>
+        <div class="lumon-title">Concept Drift — Default Rate by Grade</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    drift_grades = ['A', 'C', 'G']
+    drift_df  = df[df['grade'].isin(drift_grades)].copy()
+    drift_agg = (drift_df.groupby(['issue_year', 'grade'])['target']
+                 .mean().reset_index())
+    drift_agg['default_rate'] = drift_agg['target'] * 100
+    drift_agg = drift_agg.sort_values('issue_year')
+
+    grade_colors = {'A': '#059669', 'C': '#D97706', 'G': '#DC2626'}
+
+    fig_drift = go.Figure()
+    for g in drift_grades:
+        gdf = drift_agg[drift_agg['grade'] == g]
+        fig_drift.add_trace(go.Scatter(
+            x=gdf['issue_year'], y=gdf['default_rate'],
+            mode="lines+markers", name=f"Grade {g}",
+            line=dict(color=grade_colors[g], width=2),
+            marker=dict(size=6, symbol="square"),
+        ))
+
+    fig_drift.update_layout(
+        plot_bgcolor="#080808", paper_bgcolor="#080808",
+        font=dict(family="IBM Plex Mono, monospace", size=10, color="#525252"),
+        margin=dict(l=10, r=10, t=24, b=14),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="right", x=1,
+                    font=dict(size=9, color="#525252"),
+                    bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(showgrid=False, dtick=1, color="#525252",
+                   linecolor="#262626", linewidth=1, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor="#1A1A1A",
+                   title="DEFAULT RATE %", ticksuffix="%", color="#525252",
+                   linecolor="#262626", linewidth=1, zeroline=False),
+        hovermode="x unified",
+        height=340,
+    )
+    st.plotly_chart(fig_drift, use_container_width=True)
+
+# ──────────────── Income Paradox ──────────────────────
+with col_paradox:
+    st.markdown("""
+    <div class="brutal-card">
+        <div class="lumon-header">Anomaly Detection</div>
+        <div class="lumon-title">The Income Paradox</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    inc_df = df.dropna(subset=['annual_inc']).copy()
+    inc_df['income_q'] = pd.qcut(
+        inc_df['annual_inc'], q=4,
+        labels=['Q1 (Low)', 'Q2', 'Q3', 'Q4 (High)'],
+    )
+    inc_agg = (inc_df.groupby(['grade', 'income_q'], observed=False)['target']
+               .mean().reset_index())
+    inc_agg['default_rate'] = inc_agg['target'] * 100
+
+    q_colors = {
+        'Q1 (Low)':  '#DC2626',
+        'Q2':        '#D97706',
+        'Q3':        '#525252',
+        'Q4 (High)': '#059669',
+    }
+
+    fig_inc = go.Figure()
+    for q in ['Q1 (Low)', 'Q2', 'Q3', 'Q4 (High)']:
+        qdf = inc_agg[inc_agg['income_q'] == q]
+        fig_inc.add_trace(go.Bar(
+            x=qdf['grade'], y=qdf['default_rate'],
+            name=q, marker_color=q_colors[q],
+            marker_line=dict(width=0),
+        ))
+
+    fig_inc.update_layout(
+        barmode="group",
+        plot_bgcolor="#080808", paper_bgcolor="#080808",
+        font=dict(family="IBM Plex Mono, monospace", size=10, color="#525252"),
+        margin=dict(l=10, r=10, t=24, b=14),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="right", x=1,
+                    font=dict(size=9, color="#525252"),
+                    bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(showgrid=False, color="#525252",
+                   linecolor="#262626", linewidth=1, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor="#1A1A1A",
+                   title="DEFAULT RATE %", ticksuffix="%", color="#525252",
+                   linecolor="#262626", linewidth=1, zeroline=False),
+        bargap=0.25, bargroupgap=0.08,
+        height=340,
+    )
+    st.plotly_chart(fig_inc, use_container_width=True)
+
+
 # ──────────────────────────────────────────────────────
 # FOOTER
 # ──────────────────────────────────────────────────────
@@ -510,8 +618,7 @@ st.markdown("""
             font-family:'IBM Plex Mono',monospace;
             font-size:8px; color:#262626; letter-spacing:3px;
             text-transform:uppercase;">
-    © Lumon Industries · Kier Eagan Division of Macrodata Refinement
-    &nbsp;&nbsp;·&nbsp;&nbsp; Built with Streamlit · SHAP · Plotly · scikit-learn
+    Built with Streamlit · SHAP · Plotly · scikit-learn
     &nbsp;&nbsp;·&nbsp;&nbsp; Data: Lending Club 2007–2018
 </div>
 """, unsafe_allow_html=True)
