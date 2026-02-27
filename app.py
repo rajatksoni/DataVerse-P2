@@ -311,7 +311,8 @@ with col_shap:
         base = explainer.expected_value[1]
     else:
         sv   = shap_vals[0]
-        base = float(explainer.expected_value)
+        ev   = explainer.expected_value
+        base = float(ev[1]) if hasattr(ev, '__len__') and len(ev) > 1 else float(ev)
 
     explanation = shap.Explanation(
         values=sv,
