@@ -239,13 +239,8 @@ The app is deployed on **Streamlit Community Cloud**:
 3. Set `app.py` as the main file.
 4. Deploy — the platform auto-installs from `requirements.txt`.
 
----
 
-## 👥 Team
 
-Built with ❤️ by **The Safe Lending** team.
-
----
 
 <p align="center">
   <i>Built with Streamlit · Plotly · scikit-learn · Powered by 1M+ Lending Club loans (2007–2018)</i>
